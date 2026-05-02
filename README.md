@@ -93,9 +93,6 @@ src/
 ## 🤝 Contributing
 Contributions are welcome! If you'd like to improve Foodlink, please fork the repo and create a pull request.
 
-## 📄 License
-This project is licensed under the MIT License.
-
 ---
 
 *Made with ❤️ to reduce food waste and help those in need.*

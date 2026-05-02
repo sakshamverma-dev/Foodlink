@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCaK13dWC_aQcNw0WZdU-oLymo8SB3xsYY",
-  authDomain: "foodlink-f6965.firebaseapp.com",
-  projectId: "foodlink-f6965",
-  storageBucket: "foodlink-f6965.firebasestorage.app",
-  messagingSenderId: "506657453362",
-  appId: "1:506657453362:web:0d6fd23190ab4b1a05932b"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
