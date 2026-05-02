@@ -32,6 +32,7 @@ export default function LiveFeed() {
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [offerMessage, setOfferMessage] = useState("");
+  const [viewTextModal, setViewTextModal] = useState({ isOpen: false, title: "", text: "" });
 
   // Map of requestId => { status, offerId, donorEmail, donorPhone }
   const [offerStatusByRequest, setOfferStatusByRequest] = useState({});
@@ -77,34 +78,35 @@ export default function LiveFeed() {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        // Build a map of requestId -> latest offer info (regardless of donor)
+        // Build a map of requestId -> array of all offers, sorted by latest
         const tmp = {};
         snap.docs.forEach((d) => {
           const data = d.data();
           const reqId = data.requestId;
           const ts = data.createdAt?.seconds || 0;
           if (!reqId) return;
-          const existing = tmp[reqId];
-          if (!existing || ts >= existing._ts) {
-            tmp[reqId] = {
-              status: data.status,
-              offerId: d.id,
-              donorEmail: data.donorEmail,
-              donorPhone: data.donorPhone,
-              _ts: ts,
-            };
-          }
+          
+          if (!tmp[reqId]) tmp[reqId] = [];
+          tmp[reqId].push({
+            status: data.status,
+            offerId: d.id,
+            donorEmail: data.donorEmail,
+            donorPhone: data.donorPhone,
+            donorId: data.donorId,
+            _ts: ts,
+          });
         });
 
-        // remove internal _ts before setting state
         const cleaned = {};
         Object.keys(tmp).forEach((k) => {
-          cleaned[k] = {
-            status: tmp[k].status,
-            offerId: tmp[k].offerId,
-            donorEmail: tmp[k].donorEmail,
-            donorPhone: tmp[k].donorPhone,
-          };
+          tmp[k].sort((a, b) => b._ts - a._ts);
+          cleaned[k] = tmp[k].map(o => ({
+            status: o.status,
+            offerId: o.offerId,
+            donorEmail: o.donorEmail,
+            donorPhone: o.donorPhone,
+            donorId: o.donorId,
+          }));
         });
 
         setOfferStatusByRequest(cleaned);
@@ -394,9 +396,9 @@ export default function LiveFeed() {
               (req) => req.donationId === d.id && req.ngoId === userId && req.status !== "completed"
             );
 
-            // Get the offer status for this request (if it exists)
+            // Get the latest offer status for this request (if it exists)
             const offerStatusForRequest = existingRequestByThisNGO
-              ? offerStatusByRequest[existingRequestByThisNGO.id]
+              ? offerStatusByRequest[existingRequestByThisNGO.id]?.[0]
               : null;
 
             return (
@@ -425,6 +427,15 @@ export default function LiveFeed() {
                   Posted: {formatDate(d.createdAt)}
                 </p>
 
+                {d.description && (
+                  <button
+                    onClick={() => setViewTextModal({ isOpen: true, title: "Donation Description", text: d.description })}
+                    className="mt-2 text-blue-600 text-sm font-medium hover:underline flex items-center gap-1"
+                  >
+                    📝 View Description
+                  </button>
+                )}
+
                 <div className="mt-3 flex gap-3 items-center">
                   {/* REQUEST BUTTON (NGO only) */}
                   {userType === "ngo" && (
@@ -442,7 +453,7 @@ export default function LiveFeed() {
                           }`}
                         >
                           {offerStatusForRequest.status === "rejected"
-                            ? "Rejected ✗"
+                            ? "Request Rejected ✗"
                             : offerStatusForRequest.status === "accepted"
                             ? "Accepted ✓"
                             : offerStatusForRequest.status === "completed"
@@ -496,47 +507,36 @@ export default function LiveFeed() {
                 {ngoCreatedRequests.map((r) => {
                   const isNGO = userType === "ngo";
                   const isOwner = r.ngoId === userId;
-                  const offerInfo = offerStatusByRequest[r.id];
+                  const offersForReq = offerStatusByRequest[r.id] || [];
+                  const myOffer = offersForReq.find(o => o.donorId === userId);
+                  const otherActiveOffer = offersForReq.find(o => o.donorId !== userId && o.status !== "rejected");
+                  const shouldShowBadge = myOffer || otherActiveOffer;
 
                   const donorBadgeForRequest = (() => {
-                    if (!offerInfo) return null;
-                    const s = (offerInfo.status || "").toLowerCase();
-                    if (s === "pending") {
-                      return (
-                        <span className="mt-3 inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded">
-                          Offer Sent
-                        </span>
-                      );
+                    if (myOffer) {
+                      const s = (myOffer.status || "").toLowerCase();
+                      if (s === "pending") return <span className="mt-3 inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded">Offer Sent</span>;
+                      if (s === "accepted") return <span className="mt-3 inline-block px-4 py-2 bg-green-100 text-green-700 rounded">Accepted</span>;
+                      if (s === "rejected") return <span className="mt-3 inline-block px-4 py-2 bg-red-100 text-red-700 rounded">Rejected</span>;
+                      if (s === "completed") return <span className="mt-3 inline-block px-4 py-2 bg-green-200 text-green-800 rounded">Completed</span>;
+                      return <span className="mt-3 inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded">Offer: {myOffer.status}</span>;
                     }
-                    if (s === "accepted") {
-                      return (
-                        <span className="mt-3 inline-block px-4 py-2 bg-green-100 text-green-700 rounded">
-                          Accepted
-                        </span>
-                      );
+                    if (otherActiveOffer) {
+                      return <span className="mt-3 inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded">Someone else is Donating</span>;
                     }
-                    if (s === "rejected") {
-                      return (
-                        <span className="mt-3 inline-block px-4 py-2 bg-red-100 text-red-700 rounded">
-                          Rejected
-                        </span>
-                      );
-                    }
-                    if (s === "completed") {
-                      return (
-                        <span className="mt-3 inline-block px-4 py-2 bg-green-200 text-green-800 rounded">
-                          Completed
-                        </span>
-                      );
-                    }
-                    return (
-                      <span className="mt-3 inline-block px-4 py-2 bg-gray-100 text-gray-700 rounded">
-                        Offer: {offerInfo.status}
-                      </span>
-                    );
+                    return null;
                   })();
 
-                  return (
+                    const messageBtn = myOffer && myOffer.message ? (
+                      <button
+                        onClick={() => setViewTextModal({ isOpen: true, title: "Your Offer Message", text: myOffer.message })}
+                        className="mt-2 text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                      >
+                        💬 View My Message
+                      </button>
+                    ) : null;
+
+                    return (
                     <motion.div
                       key={r.id}
                       initial={{ opacity: 0 }}
@@ -559,6 +559,15 @@ export default function LiveFeed() {
                         <b>Contact:</b> {contactFrom(r)}
                       </p>
 
+                      {r.description && (
+                        <button
+                          onClick={() => setViewTextModal({ isOpen: true, title: "NGO Description", text: r.description })}
+                          className="mt-2 text-blue-600 text-sm font-medium hover:underline flex items-center gap-1"
+                        >
+                          📝 View Description
+                        </button>
+                      )}
+
                       <div className="mt-3 flex gap-3 items-center">
                         {isNGO && isOwner ? (
                           <>
@@ -575,11 +584,27 @@ export default function LiveFeed() {
                                 Delete
                               </button>
                             )}
+
+                            {/* Show messages from donors to the NGO owner */}
+                            <div className="w-full mt-3">
+                              {offersForReq.filter(o => o.message).map((o, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => setViewTextModal({ isOpen: true, title: `Message from Donor`, text: o.message })}
+                                  className="text-blue-600 text-xs font-medium hover:underline block mb-1"
+                                >
+                                  💬 Message from Donor {idx + 1}
+                                </button>
+                              ))}
+                            </div>
                           </>
                         ) : (
                           userType === "donor" && (
-                            offerInfo ? (
-                              donorBadgeForRequest
+                            shouldShowBadge ? (
+                              <div className="flex flex-col items-start">
+                                {donorBadgeForRequest}
+                                {messageBtn}
+                              </div>
                             ) : (
                               <button
                                 className="px-4 py-2 bg-green-600 text-white rounded"
@@ -607,7 +632,7 @@ export default function LiveFeed() {
               ) : (
                 <div className="space-y-4">
                   {donationLinkedRequests.map((r) => {
-                    const offerInfo = offerStatusByRequest[r.id];
+                    const offerInfo = offerStatusByRequest[r.id]?.[0];
 
                     return (
                       <motion.div
@@ -642,7 +667,7 @@ export default function LiveFeed() {
                               }`}
                             >
                               {offerInfo.status === "rejected"
-                                ? "Rejected ✗"
+                                ? "Request Rejected ✗"
                                 : offerInfo.status === "accepted"
                                 ? "Accepted ✓"
                                 : offerInfo.status === "completed"
@@ -663,7 +688,7 @@ export default function LiveFeed() {
 
       {/* OFFER MODAL */}
       {offerOpen && selectedRequest && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <motion.div
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
@@ -695,6 +720,30 @@ export default function LiveFeed() {
                 Send Offer
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* VIEW TEXT MODAL (for descriptions/messages) */}
+      {viewTextModal.isOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white p-6 w-[90%] max-w-md rounded-2xl shadow-2xl relative"
+          >
+            <h2 className="text-xl font-bold mb-4 text-slate-800">{viewTextModal.title}</h2>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <p className="text-slate-600 whitespace-pre-wrap leading-relaxed">
+                {viewTextModal.text}
+              </p>
+            </div>
+            <button
+              className="mt-6 w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+              onClick={() => setViewTextModal({ isOpen: false, title: "", text: "" })}
+            >
+              Close
+            </button>
           </motion.div>
         </div>
       )}

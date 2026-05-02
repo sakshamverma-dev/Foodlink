@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiMail, FiLock, FiUser, FiMapPin, FiPhone } from "react-icons/fi";
+import { FiMail, FiLock, FiUser, FiMapPin, FiPhone, FiEye, FiEyeOff } from "react-icons/fi";
 
 export default function Signup() {
   const nav = useNavigate();
@@ -87,7 +87,7 @@ export default function Signup() {
           <InputWithIcon
             Icon={FiLock}
             name="pass"
-            type="password"
+            isPassword
             placeholder="Password"
             onChange={update}
             required
@@ -134,14 +134,27 @@ export default function Signup() {
   );
 }
 
-function InputWithIcon({ Icon, ...props }) {
+function InputWithIcon({ Icon, isPassword, ...props }) {
+  const [show, setShow] = useState(false);
+  const type = isPassword ? (show ? "text" : "password") : props.type;
+
   return (
     <div className="relative">
       <Icon className="absolute left-3 top-3.5 text-slate-400 text-sm" />
       <input
         {...props}
-        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+        type={type}
+        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
       />
+      {isPassword && (
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+        >
+          {show ? <FiEyeOff className="text-sm" /> : <FiEye className="text-sm" />}
+        </button>
+      )}
     </div>
   );
 }

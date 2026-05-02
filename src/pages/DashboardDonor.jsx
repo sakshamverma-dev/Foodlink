@@ -20,7 +20,9 @@ export default function DashboardDonor() {
   const [donations, setDonations] = useState([]);
   const [offers, setOffers] = useState([]);
   const [incomingRequests, setIncomingRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
   const [userName, setUserName] = useState("User");
+  const [viewTextModal, setViewTextModal] = useState({ isOpen: false, title: "", text: "" });
 
   useEffect(() => {
     const u = auth.currentUser;
@@ -66,6 +68,14 @@ export default function DashboardDonor() {
     const q = query(collection(db, "requests"), where("donorId", "==", u.uid));
     return onSnapshot(q, (snap) => {
       setIncomingRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  // Fetch ALL requests to link descriptions to offers
+  useEffect(() => {
+    const q = collection(db, "requests");
+    return onSnapshot(q, (snap) => {
+      setAllRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
   }, []);
 
@@ -217,6 +227,8 @@ export default function DashboardDonor() {
         createdAt: serverTimestamp(),
       });
 
+      await updateDoc(doc(db, "requests", req.id), { status: "approved" });
+
       alert("Request accepted ✔️ (NGO will see your response)");
     } catch (err) {
       console.error("Failed to accept request:", err);
@@ -275,6 +287,8 @@ export default function DashboardDonor() {
         createdAt: serverTimestamp(),
       });
 
+      await updateDoc(doc(db, "requests", req.id), { status: "rejected" });
+
       alert("Request rejected. NGO will see your response.");
     } catch (err) {
       console.error("Failed to reject request:", err);
@@ -300,22 +314,22 @@ export default function DashboardDonor() {
   // Build set of donation IDs that exist (to filter out requests for deleted donations)
   const existingDonationIds = new Set(donations.map((d) => d.id));
 
-  // Build set of requestIds that have a rejected offer from this donor
-  const rejectedRequestIds = new Set(
+  // Build set of requestIds that have an accepted, completed or rejected offer from this donor
+  const handledRequestIds = new Set(
     offers
-      .filter((o) => o.status === "rejected")
+      .filter((o) => o.status === "rejected" || o.status === "accepted" || o.status === "completed")
       .map((o) => o.requestId)
   );
 
   // Show only requests that:
   // 1. Are pending
   // 2. Have a valid donationId that still exists (not deleted)
-  // 3. Don't have a rejected offer from this donor
+  // 3. Haven't been handled by this donor yet
   const pendingRequests = incomingRequests.filter(
     (r) =>
       r.status === "pending" &&
       existingDonationIds.has(r.donationId) &&
-      !rejectedRequestIds.has(r.id)
+      !handledRequestIds.has(r.id)
   );
 
   return (
@@ -380,6 +394,15 @@ export default function DashboardDonor() {
                     Requested on: {formatDate(req.createdAt)}
                   </p>
 
+                  {req.description && (
+                    <button
+                      onClick={() => setViewTextModal({ isOpen: true, title: "NGO Request Description", text: req.description })}
+                      className="mt-2 text-blue-600 text-sm font-medium hover:underline block"
+                    >
+                      📝 View Description
+                    </button>
+                  )}
+
                   <span className={`inline-block mt-2 px-3 py-1 text-sm rounded-full ${statusBadge}`}>
                     {req.status.toUpperCase()}
                   </span>
@@ -435,6 +458,30 @@ export default function DashboardDonor() {
               >
                 {o.status.toUpperCase()}
               </span>
+              <div className="flex flex-col items-start mt-2 gap-1">
+                {/* NGO's Request Description */}
+                {(() => {
+                  const relReq = allRequests.find(r => r.id === o.requestId);
+                  return relReq && relReq.description && (
+                    <button
+                      onClick={() => setViewTextModal({ isOpen: true, title: "NGO Request Description", text: relReq.description })}
+                      className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                    >
+                      📝 View NGO Description
+                    </button>
+                  );
+                })()}
+
+                {/* Donor's Own Message */}
+                {o.message && (
+                  <button
+                    onClick={() => setViewTextModal({ isOpen: true, title: "Your Offer Message", text: o.message })}
+                    className="text-blue-600 text-xs font-medium hover:underline flex items-center gap-1"
+                  >
+                    💬 View My Message
+                  </button>
+                )}
+              </div>
             </div>
 
             {o.status === "pending" && (
@@ -465,6 +512,15 @@ export default function DashboardDonor() {
             </p>
             <p className="text-xs text-slate-500">Date: {formatDate(d.createdAt)}</p>
             <p className="text-xs text-slate-700">Status: {d.status}</p>
+
+            {d.description && (
+              <button
+                onClick={() => setViewTextModal({ isOpen: true, title: "Your Donation Description", text: d.description })}
+                className="mt-2 text-blue-600 text-xs font-medium hover:underline block"
+              >
+                📝 View Description
+              </button>
+            )}
           </div>
 
           {d.status === "pending" && (
@@ -477,6 +533,30 @@ export default function DashboardDonor() {
           )}
         </motion.div>
       ))}
+
+      {/* VIEW TEXT MODAL */}
+      {viewTextModal.isOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white p-6 w-[90%] max-w-md rounded-2xl shadow-2xl relative"
+          >
+            <h2 className="text-xl font-bold mb-4 text-slate-800">{viewTextModal.title}</h2>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <p className="text-slate-600 whitespace-pre-wrap leading-relaxed">
+                {viewTextModal.text}
+              </p>
+            </div>
+            <button
+              className="mt-6 w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+              onClick={() => setViewTextModal({ isOpen: false, title: "", text: "" })}
+            >
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

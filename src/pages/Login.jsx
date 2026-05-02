@@ -4,12 +4,13 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiLock, FiMail } from "react-icons/fi";
+import { FiLock, FiMail, FiEye, FiEyeOff } from "react-icons/fi";
 
 export default function Login() {
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const loginUser = async (e) => {
@@ -67,12 +68,19 @@ export default function Login() {
           <div className="relative">
             <FiLock className="absolute left-3 top-3.5 text-slate-400 text-sm" />
             <input
-              type="password"
+              type={showPass ? "text" : "password"}
               placeholder="Password"
-              className="w-full border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full border border-slate-200 dark:border-slate-600 rounded-xl py-2.5 pl-9 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               onChange={(e) => setPass(e.target.value)}
               required
             />
+            <button
+              type="button"
+              onClick={() => setShowPass(!showPass)}
+              className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+            >
+              {showPass ? <FiEyeOff className="text-sm" /> : <FiEye className="text-sm" />}
+            </button>
           </div>
 
           <button

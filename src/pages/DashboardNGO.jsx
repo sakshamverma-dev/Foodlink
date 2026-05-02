@@ -26,6 +26,7 @@ export default function DashboardNGO() {
   const [offers, setOffers] = useState([]);
   const [allOffers, setAllOffers] = useState([]);
   const [donations, setDonations] = useState([]);
+  const [viewTextModal, setViewTextModal] = useState({ isOpen: false, title: "", text: "" });
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -95,6 +96,11 @@ export default function DashboardNGO() {
     // Only hide if this is a donation-linked request and the donation no longer exists
     if (r.donationId && !existingDonationIds.has(r.donationId)) {
       return false;
+    }
+    // Also hide if this donation-linked request was rejected by the donor
+    if (r.donationId) {
+      const isRejected = allOffers.some(o => o.requestId === r.id && o.status === "rejected");
+      if (isRejected) return false;
     }
     // Show all other requests
     return true;
@@ -288,6 +294,33 @@ export default function DashboardNGO() {
                     Requested on: {formatDate(r.createdAt)}
                   </p>
 
+                  {r.description && (
+                    <button
+                      onClick={() => setViewTextModal({ isOpen: true, title: "Your Request Description", text: r.description })}
+                      className="mt-2 text-blue-600 text-sm font-medium hover:underline block"
+                    >
+                      📝 View Full Description
+                    </button>
+                  )}
+
+                  {/* If this was a donation-linked request, show the donation's description too */}
+                  {(() => {
+                    if (r.donationId) {
+                      const linkedDon = donations.find(d => d.id === r.donationId);
+                      if (linkedDon && linkedDon.description) {
+                        return (
+                          <button
+                            onClick={() => setViewTextModal({ isOpen: true, title: "Original Donation Description", text: linkedDon.description })}
+                            className="mt-2 text-green-600 text-sm font-medium hover:underline block"
+                          >
+                            📦 View Donation Description
+                          </button>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+
                   <span
                     className={`mt-2 inline-block px-3 py-1 text-sm rounded-full ${badgeClass}`}
                   >
@@ -326,10 +359,18 @@ export default function DashboardNGO() {
                 if (o.status === "rejected")
                   badgeClass = "bg-red-100 text-red-700";
 
+                const relatedReq = requests.find(r => r.id === o.requestId);
+                const isDonationLinked = !!(relatedReq && relatedReq.donationId);
+
+                let statusText = o.status.toUpperCase();
+                if (o.status === "rejected") {
+                  statusText = isDonationLinked ? "DONOR REJECTED" : "NGO REJECTED";
+                }
+
                 return (
                   <div key={o.id} className="p-5 border rounded-xl bg-white shadow-sm">
                     <p className="text-lg font-bold">
-                      Offer by {o.donorName}
+                      {isDonationLinked ? `Response from ${o.donorName}` : `Offer by ${o.donorName}`}
                     </p>
 
                     <p className="text-sm text-gray-600">Food: {o.foodItem}</p>
@@ -351,10 +392,19 @@ export default function DashboardNGO() {
                       Offered on: {formatDate(o.createdAt)}
                     </p>
 
+                    {o.message && (
+                      <button
+                        onClick={() => setViewTextModal({ isOpen: true, title: "Donor Message", text: o.message })}
+                        className="mt-2 text-blue-600 text-sm font-medium hover:underline block"
+                      >
+                        💬 View Message
+                      </button>
+                    )}
+
                     <span
                       className={`mt-2 inline-block px-3 py-1 text-sm rounded-full ${badgeClass}`}
                     >
-                      {o.status.toUpperCase()}
+                      {statusText}
                     </span>
 
                     {o.status === "pending" && (
@@ -389,6 +439,30 @@ export default function DashboardNGO() {
           </div>
         )}
       </div>
+
+      {/* VIEW TEXT MODAL */}
+      {viewTextModal.isOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white p-6 w-[90%] max-w-md rounded-2xl shadow-2xl relative"
+          >
+            <h2 className="text-xl font-bold mb-4 text-slate-800">{viewTextModal.title}</h2>
+            <div className="max-h-[60vh] overflow-y-auto">
+              <p className="text-slate-600 whitespace-pre-wrap leading-relaxed">
+                {viewTextModal.text}
+              </p>
+            </div>
+            <button
+              className="mt-6 w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors"
+              onClick={() => setViewTextModal({ isOpen: false, title: "", text: "" })}
+            >
+              Close
+            </button>
+          </motion.div>
+        </div>
+      )}
     </motion.div>
   );
 }

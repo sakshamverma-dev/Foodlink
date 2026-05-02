@@ -13,6 +13,7 @@ export default function Donate() {
   const [foodItem, setFoodItem] = useState("");
   const [quantity, setQuantity] = useState("");
   const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -93,6 +94,7 @@ export default function Donate() {
         foodItem: foodItem.trim(),
         quantity: Number(quantity) || 0,
         pickupLocation: location.trim(),
+        description: description.trim(),
         status: "pending",
         createdAt: serverTimestamp(),
       });
@@ -100,6 +102,7 @@ export default function Donate() {
       setFoodItem("");
       setQuantity("");
       setLocation("");
+      setDescription("");
 
       alert("Donation submitted successfully ✅");
     } catch (err) {
@@ -145,6 +148,13 @@ export default function Donate() {
           placeholder="Your address or pickup spot"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
+        />
+
+        <textarea
+          className="w-full border rounded-lg px-4 py-2 min-h-[120px] outline-none focus:ring-2 focus:ring-green-500"
+          placeholder="Description / Message (optional)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
 
         <button
