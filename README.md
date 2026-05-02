@@ -1,5 +1,7 @@
 # 🍲 Foodlink: Bridge the Plate
 
+**Live Demo**: [foodlinkk.netlify.app](https://foodlinkk.netlify.app/)
+
 **Foodlink** is a modern, real-time web application designed to bridge the gap between food donors and NGOs. It facilitates efficient food distribution by allowing donors to list surplus food and NGOs to request specific needs, all in real-time.
 
 ---
